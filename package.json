@@ -1,0 +1,16 @@
+﻿{
+  "name": "saas-cnpj-google",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "web": "node server.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "fastify": "^4.26.2",
+    "@fastify/formbody": "^7.4.0"
+  }
+}
