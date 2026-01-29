@@ -328,7 +328,7 @@ const TEMPLATE = `<!doctype html>
       const googleBtn = document.getElementById("googleBtn");
       const authActions = document.querySelector(".auth-actions");
 
-      const GOOGLE_CLIENT_ID = "${process.env.GOOGLE_CLIENT_ID || ""}";
+      const GOOGLE_CLIENT_ID = ${JSON.stringify(process.env.GOOGLE_CLIENT_ID || "")};
 
       function setAuthState(isSignedIn, profile) {
         panel.classList.toggle("auth-locked", !isSignedIn);
