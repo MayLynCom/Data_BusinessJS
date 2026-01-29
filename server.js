@@ -83,16 +83,6 @@ const TEMPLATE = `<!doctype html>
       border: 1px dashed rgba(15, 107, 78, 0.25);
       pointer-events: none;
     }
-    .panel::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 24px;
-      width: 68px;
-      height: 4px;
-      border-radius: 999px;
-      background: linear-gradient(90deg, var(--accent), var(--accent-2));
-    }
     .badge {
       display: inline-flex;
       align-items: center;
