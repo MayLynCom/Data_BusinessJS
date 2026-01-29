@@ -15,6 +15,7 @@ const TEMPLATE = `<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Busca CNPJ</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Merriweather:wght@700&family=Open+Sans:wght@400;600&display=swap");
     :root {
@@ -83,6 +84,64 @@ const TEMPLATE = `<!doctype html>
       border: 1px dashed rgba(15, 107, 78, 0.25);
       pointer-events: none;
     }
+    .auth-bar {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      display: grid;
+      gap: 8px;
+      justify-items: end;
+      z-index: 5;
+    }
+    .auth-status {
+      padding: 6px 2px;
+      border-radius: 999px;
+      font-size: 11px;
+      letter-spacing: 0.4px;
+      background: transparent;
+      color: var(--ink);
+      min-width: 140px;
+      text-align: left;
+    }
+    .auth-status:empty {
+      display: none;
+    }
+    .auth-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 1px;
+    }
+    .auth-actions.auth-on {
+      padding: 4px 8px;
+      background: #ffffff;
+      border-radius: 999px;
+      box-shadow: 0 6px 16px rgba(15, 17, 12, 0.12);
+    }
+    .logout-btn {
+      border: 0;
+      padding: 4px 4px 10px;
+      border-radius: 999px;
+      background: transparent;
+      color: #e45757;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      box-shadow: none;
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    .logout-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: none;
+      text-decoration: underline;
+    }
+    .logout-btn[hidden] {
+      display: none;
+    }
+    .auth-locked .auth-status {
+      background: rgba(95, 103, 98, 0.12);
+      color: var(--muted);
+    }
     .badge {
       display: inline-flex;
       align-items: center;
@@ -108,8 +167,45 @@ const TEMPLATE = `<!doctype html>
       line-height: 1.6;
     }
     form {
+      position: relative;
       display: grid;
       gap: 14px;
+    }
+    fieldset {
+      border: 0;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 14px;
+    }
+    fieldset:disabled input {
+      background: #f1f4f1;
+    }
+    fieldset:disabled button {
+      opacity: 0.65;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+    .auth-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 16px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--muted);
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .auth-locked .auth-overlay {
+      opacity: 1;
+      pointer-events: auto;
     }
     label {
       display: block;
@@ -183,6 +279,10 @@ const TEMPLATE = `<!doctype html>
       body { padding: 18px; }
       .panel { padding: 20px; }
       h1 { font-size: 26px; }
+      .auth-bar {
+        top: 12px;
+        right: 12px;
+      }
     }
     @media (prefers-reduced-motion: reduce) {
       * { animation: none !important; transition: none !important; }
@@ -190,25 +290,124 @@ const TEMPLATE = `<!doctype html>
   </style>
 </head>
 <body>
-  <div class="panel">
+  <div class="auth-bar">
+    <div class="auth-actions">
+      <div class="auth-status" id="authStatus"></div>
+      <button class="logout-btn" id="logoutBtn" type="button" hidden>Sair</button>
+    </div>
+    <div id="googleBtn"></div>
+  </div>
+  <div class="panel auth-locked" id="panelRoot">
     <span class="badge">Data Business</span>
     <h1>Busca CNPJ</h1>
     <p class="subtitle">Preencha o tipo e a cidade para gerar o arquivo automaticamente.</p>
     <form method="post">
-      <div class="field">
-        <label for="tipo">Tipo (ex: Restaurante)</label>
-        <input id="tipo" name="tipo" value="__TIPO__" required placeholder="Restaurante">
-      </div>
-      <div class="field">
-        <label for="cidade">Cidade (ex: Santos)</label>
-        <input id="cidade" name="cidade" value="__CIDADE__" required placeholder="Santos">
-      </div>
-      <button type="submit">Gerar arquivo</button>
+      <div class="auth-overlay" id="authOverlay">Faca login com Google para usar a aplicação.</div>
+      <fieldset id="appFields" disabled>
+        <div class="field">
+          <label for="tipo">Tipo (ex: Restaurante)</label>
+          <input id="tipo" name="tipo" value="__TIPO__" required placeholder="Restaurante">
+        </div>
+        <div class="field">
+          <label for="cidade">Cidade (ex: Santos)</label>
+          <input id="cidade" name="cidade" value="__CIDADE__" required placeholder="Santos">
+        </div>
+        <button type="submit">Gerar arquivo</button>
+      </fieldset>
     </form>
     __ERROR_BLOCK__
     __MESSAGE_BLOCK__
     __DOWNLOAD_BLOCK__
   </div>
+  <script>
+    (function () {
+      const panel = document.getElementById("panelRoot");
+      const fields = document.getElementById("appFields");
+      const statusEl = document.getElementById("authStatus");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const googleBtn = document.getElementById("googleBtn");
+      const authActions = document.querySelector(".auth-actions");
+
+      const GOOGLE_CLIENT_ID = "1086260719407-pjv0l9jff2ljdrbha5u0dji0bm28isqt.apps.googleusercontent.com";
+
+      function setAuthState(isSignedIn, profile) {
+        panel.classList.toggle("auth-locked", !isSignedIn);
+        fields.disabled = !isSignedIn;
+        logoutBtn.hidden = !isSignedIn;
+        googleBtn.style.display = isSignedIn ? "none" : "";
+        authActions.classList.toggle("auth-on", isSignedIn);
+        if (isSignedIn && profile) {
+          const rawName = profile.name || "";
+          const firstName = rawName.trim().split(/\s+/)[0] || "";
+          const emailHandle = (profile.email || "").split("@")[0];
+          const label = firstName || emailHandle || "Logado";
+          statusEl.textContent = "Logado: " + label;
+        } else {
+          statusEl.textContent = "";
+        }
+      }
+
+      function parseJwt(token) {
+        try {
+          const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+          const json = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join("")
+          );
+          return JSON.parse(json);
+        } catch (err) {
+          return null;
+        }
+      }
+
+      window.handleCredentialResponse = (response) => {
+        const payload = parseJwt(response.credential);
+        if (!payload) {
+          statusEl.textContent = "Falha ao validar login.";
+          return;
+        }
+        setAuthState(true, { name: payload.name, email: payload.email, picture: payload.picture });
+      };
+
+      function initGoogle() {
+        if (!window.google || !google.accounts || !google.accounts.id) {
+          statusEl.textContent = "Google nao carregou.";
+          return;
+        }
+        if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.indexOf("YOUR_") === 0) {
+          statusEl.textContent = "Defina o Client ID do Google.";
+          return;
+        }
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleCredentialResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+        google.accounts.id.renderButton(document.getElementById("googleBtn"), {
+          type: "standard",
+          theme: "outline",
+          size: "large",
+          text: "continue_with",
+          shape: "pill",
+          logo_alignment: "left",
+          width: 220,
+        });
+      }
+
+      logoutBtn.addEventListener("click", function () {
+        if (window.google && google.accounts && google.accounts.id) {
+          google.accounts.id.disableAutoSelect();
+        }
+        setAuthState(false);
+      });
+
+      setAuthState(false);
+      window.addEventListener("load", initGoogle);
+    })();
+  </script>
 </body>
 </html>`;
 
@@ -365,4 +564,5 @@ fastify.listen({ host: HOST, port: PORT }, (err) => {
   }
   console.log(`Servidor em http://${HOST}:${PORT}`);
 });
+
 
