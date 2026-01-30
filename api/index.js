@@ -19,6 +19,11 @@ const TEMPLATE = `<!doctype html>
       --accent-2: #f0a452;
       --ring: rgba(15, 107, 78, 0.24);
       --shadow: 0 18px 50px rgba(15, 17, 12, 0.15);
+      --pill-shadow: 0 10px 24px rgba(34, 74, 55, 0.16);
+      --pill-border: rgba(15, 107, 78, 0.15);
+      --pill-green: #13a36f;
+      --pill-text: #1f2b25;
+      --pill-red: #d64c4c;
     }
     * { box-sizing: border-box; }
     body {
@@ -80,58 +85,63 @@ const TEMPLATE = `<!doctype html>
       top: 18px;
       right: 18px;
       display: grid;
-      gap: 8px;
+      gap: 10px;
       justify-items: end;
       z-index: 5;
     }
-    .auth-status {
-      padding: 6px 2px;
-      border-radius: 999px;
-      font-size: 11px;
-      letter-spacing: 0.4px;
-      background: transparent;
-      color: var(--ink);
-      min-width: 140px;
-      text-align: left;
-    }
-    .auth-status:empty {
-      display: none;
-    }
-    .auth-actions {
+    .auth-pill {
       display: inline-flex;
       align-items: center;
-      gap: 1px;
-    }
-    .auth-actions.auth-on {
-      padding: 4px 8px;
-      background: #ffffff;
+      gap: 10px;
+      padding: 10px 16px;
       border-radius: 999px;
-      box-shadow: 0 6px 16px rgba(15, 17, 12, 0.12);
+      background: #ffffff;
+      border: 1px solid var(--pill-border);
+      box-shadow: var(--pill-shadow);
+      font-size: 13px;
+      color: var(--pill-text);
+    }
+    .auth-pill[hidden] {
+      display: none;
+    }
+    .auth-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .auth-name {
+      font-weight: 600;
+    }
+    .auth-credits strong {
+      color: var(--pill-red);
+      font-weight: 700;
+    }
+    .auth-cta {
+      color: var(--pill-green);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .auth-cta:hover {
+      text-decoration: underline;
+    }
+    .auth-sep {
+      width: 1px;
+      height: 14px;
+      background: rgba(18, 36, 28, 0.18);
     }
     .logout-btn {
       border: 0;
-      padding: 4px 4px 10px;
-      border-radius: 999px;
       background: transparent;
-      color: #e45757;
-      font-size: 11px;
+      color: var(--pill-text);
+      font-size: 13px;
       font-weight: 600;
-      letter-spacing: 0.3px;
       cursor: pointer;
-      box-shadow: none;
-      transition: transform 0.15s ease, box-shadow 0.2s ease;
+      padding: 0;
+      margin-top: -0.1px;
     }
     .logout-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: none;
       text-decoration: underline;
-    }
-    .logout-btn[hidden] {
-      display: none;
-    }
-    .auth-locked .auth-status {
-      background: rgba(95, 103, 98, 0.12);
-      color: var(--muted);
     }
     .badge {
       display: inline-flex;
@@ -264,6 +274,14 @@ const TEMPLATE = `<!doctype html>
         top: 12px;
         right: 12px;
       }
+      .auth-pill {
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px 12px;
+      }
+      .auth-sep {
+        display: none;
+      }
     }
     @media (prefers-reduced-motion: reduce) {
       * { animation: none !important; transition: none !important; }
@@ -272,9 +290,14 @@ const TEMPLATE = `<!doctype html>
 </head>
 <body>
   <div class="auth-bar">
-    <div class="auth-actions">
-      <div class="auth-status" id="authStatus"></div>
-      <button class="logout-btn" id="logoutBtn" type="button" hidden>Sair</button>
+    <div class="auth-pill" id="authPill" hidden>
+      <span class="auth-item auth-name" id="authName">Olá, Usuario</span>
+      <span class="auth-sep" aria-hidden="true"></span>
+      <span class="auth-item auth-credits"> <strong id="authCreditsValue">0</strong> Créditos</span>
+      <span class="auth-sep" aria-hidden="true"></span>
+      <a class="auth-item auth-cta" href="#" id="authSubscribe">Assinar</a>
+      <span class="auth-sep" aria-hidden="true"></span>
+      <button class="auth-item logout-btn" id="logoutBtn" type="button">Sair</button>
     </div>
     <div id="googleBtn"></div>
   </div>
@@ -302,27 +325,30 @@ const TEMPLATE = `<!doctype html>
     (function () {
       const panel = document.getElementById("panelRoot");
       const fields = document.getElementById("appFields");
-      const statusEl = document.getElementById("authStatus");
+      const authPill = document.getElementById("authPill");
+      const nameEl = document.getElementById("authName");
+      const creditsEl = document.getElementById("authCreditsValue");
       const logoutBtn = document.getElementById("logoutBtn");
       const googleBtn = document.getElementById("googleBtn");
-      const authActions = document.querySelector(".auth-actions");
 
       const GOOGLE_CLIENT_ID = ${JSON.stringify(process.env.GOOGLE_CLIENT_ID || "")};
 
       function setAuthState(isSignedIn, profile) {
         panel.classList.toggle("auth-locked", !isSignedIn);
         fields.disabled = !isSignedIn;
-        logoutBtn.hidden = !isSignedIn;
+        authPill.hidden = !isSignedIn;
         googleBtn.style.display = isSignedIn ? "none" : "";
-        authActions.classList.toggle("auth-on", isSignedIn);
         if (isSignedIn && profile) {
           const rawName = profile.name || "";
-          const firstName = rawName.trim().split(/\s+/)[0] || "";
+          const firstName = (profile.givenName || rawName).trim().split(/\s+/)[0] || "";
           const emailHandle = (profile.email || "").split("@")[0];
-          const label = firstName || emailHandle || "Logado";
-          statusEl.textContent = "Logado: " + label;
+          const emailFirst = emailHandle.split(/[._-]/)[0] || "";
+          const label = firstName || emailFirst || emailHandle || "Logado";
+          nameEl.textContent = "Olá, " + label;
+          creditsEl.textContent = "0";
         } else {
-          statusEl.textContent = "";
+          nameEl.textContent = "Olá, Usuario";
+          creditsEl.textContent = "0";
         }
       }
 
@@ -347,16 +373,19 @@ const TEMPLATE = `<!doctype html>
           statusEl.textContent = "Falha ao validar login.";
           return;
         }
-        setAuthState(true, { name: payload.name, email: payload.email, picture: payload.picture });
+        setAuthState(true, {
+          name: payload.name,
+          givenName: payload.given_name,
+          email: payload.email,
+          picture: payload.picture,
+        });
       };
 
       function initGoogle() {
         if (!window.google || !google.accounts || !google.accounts.id) {
-          statusEl.textContent = "Google nao carregou.";
           return;
         }
         if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.indexOf("YOUR_") === 0) {
-          statusEl.textContent = "Defina o Client ID do Google.";
           return;
         }
         google.accounts.id.initialize({
