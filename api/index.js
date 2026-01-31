@@ -133,12 +133,17 @@ const TEMPLATE = `<!doctype html>
     .logout-btn {
       border: 0;
       background: transparent;
+      background-color: transparent;
+      background-image: none;
       color: var(--pill-text);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       padding: 0;
       margin-top: -0.1px;
+      box-shadow: none;
+      appearance: none;
+      -webkit-appearance: none;
     }
     .logout-btn:hover {
       text-decoration: underline;
@@ -275,12 +280,12 @@ const TEMPLATE = `<!doctype html>
         right: 12px;
       }
       .auth-pill {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: 6px;
         padding: 10px 12px;
-      }
-      .auth-sep {
-        display: none;
+        width: calc((100vw - 24px) * 0.75);
+        justify-content: center;
+        font-size: 12px;
       }
     }
     @media (prefers-reduced-motion: reduce) {
